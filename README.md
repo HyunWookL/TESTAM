@@ -49,10 +49,11 @@ For more parameter information, please refer to `train.py`.
 We provide a more detailed and complete command description for the training code:
 
 ```
-python -u train.py --device DEVICE --data DATA --adjdata ADJDATA --adjtype ADJTYPE --seq_length SEQ_LENGTH --nhid NHID
- --in_dim IN_DIM --num_nodes N --batch_size B --dropout DROPOUT --epochs EPOCHS --print_every PRINT_EVERY --seed SEED
- --save SAVE --expid EXPID --load_path LOAD_PATH --patience PATIENCE --lr_mul LR_MUL --n_warmup_steps N_WARMUP_STEPS
- --quantile Q --is_quantile IS_QUANTILE --warmup_epoch WARMUP_EPOCH
+python -u train.py --device DEVICE --data DATA --adjdata ADJDATA --adjtype ADJTYPE
+ --seq_length SEQ_LENGTH --nhid NHID --in_dim IN_DIM --num_nodes N --batch_size B
+ --dropout DROPOUT --epochs EPOCHS --print_every PRINT_EVERY --seed SEED
+ --save SAVE --expid EXPID --load_path LOAD_PATH --patience PATIENCE --lr_mul LR_MUL
+ --n_warmup_steps N_WARMUP_STEPS --quantile Q --is_quantile IS_QUANTILE --warmup_epoch WARMUP_EPOCH
 ```
 
 The detailed descriptions of the arguments are as follows:
@@ -85,8 +86,9 @@ The detailed descriptions of the arguments are as follows:
 ### Model Testing
 For the testing, you can run the code below:
 ```
-python test.py --device DEVICE --data DATA --adjdata ADJDATA --adjtype ADJTYPE --seq_length SEQ_LENGTH --nhid NHID
- --in_dim IN_DIM --num_nodes N --batch_size B --save SAVE --load_path LOAD_PATH
+python test.py --device DEVICE --data DATA --adjdata ADJDATA --adjtype ADJTYPE
+ --seq_length SEQ_LENGTH --nhid NHID --in_dim IN_DIM --num_nodes N --batch_size B
+ --save SAVE --load_path LOAD_PATH
 ```
 
 ## Citation
