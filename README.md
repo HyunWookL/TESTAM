@@ -23,7 +23,7 @@ The other datasets, including METR-LA, can be found in [Google Drive](https://dr
 In the data processing stage, We have the same process as [DCRNN](https://github.com/liyaguang/DCRNN).
 ```
 # Create data directories
-mkdir -p data/{METR-LA,PEMS-BAY,NAVER-Seoul}
+mkdir -p data/{METR-LA,PEMS-BAY,EXPY-TKY}
 
 # METR-LA
 python generate_training_data.py --output_dir=data/METR-LA --traffic_df_fiilename=data/metr-la.h5 --seq_length_x INPUT_SEQ_LENGTH --seq_length_y PRED_SEQ_LENGTH
