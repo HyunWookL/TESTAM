@@ -38,7 +38,7 @@ def count_parameters(model):
 
 
 def main():
-    set seed
+    #set seed
     if args.seed != -1:
         print("Start Deterministic Training with seed {}".format(args.seed))
         torch.manual_seed(args.seed)
