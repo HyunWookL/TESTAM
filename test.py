@@ -5,49 +5,37 @@ import time
 import util
 from engine import trainer
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--device',type=str,default='cuda:0',help='')
-parser.add_argument('--data',type=str,default='data/METR-LA',help='data path')
-parser.add_argument('--adjdata',type=str,default='data/sensor_graph/adj_mx.pkl',help='adj data path')
-parser.add_argument('--adjtype',type=str,default='doubletransition',help='adj type')
-parser.add_argument('--seq_length',type=int,default=12,help='')
-parser.add_argument('--nhid',type=int,default=32,help='')
-parser.add_argument('--in_dim',type=int,default=2,help='inputs dimension')
-parser.add_argument('--num_nodes',type=int,default=207,help='number of nodes')
-parser.add_argument('--batch_size',type=int,default=64,help='batch size')
-parser.add_argument('--save',type=str,default=None,help='save path')
-parser.add_argument('--load_path',type=str,default=None,help='load path')
-args = parser.parse_args()
-
-
-
-
-def main():
-    #load data
-    device = torch.device(args.device)
-    sensor_ids, sensor_id_to_ind, adj_mx = util.load_adj(args.adjdata,args.adjtype)
-    dataloader = util.load_dataset(args.data, args.batch_size, args.batch_size, args.batch_size)
-    scaler = dataloader['scaler']
-    supports = [torch.tensor(i).to(device) for i in adj_mx]
-    args.num_nodes = len(sensor_ids)
-    args.gcn_bool = True
-    args.addaptadj = True
-
-    print(args)
-
-    if args.randomadj:
-        adjinit = None
-    else:
-        adjinit = supports[0]
-
-    if args.aptonly:
-        supports = None
-
-
-
+parser = argparse.ArgumentParser()                                                      
+parser.add_argument('--device',type=str,default='cuda:0',help='')                       
+parser.add_argument('--data',type=str,default='data/METR-LA',help='data path')          
+parser.add_argument('--adjdata',type=str,default='data/METR-LA/adj_mx.pkl',help='adj data path')                                                                                
+parser.add_argument('--adjtype',type=str,default='doubletransition',help='adj type')    
+parser.add_argument('--seq_length',type=int,default=12,help='')                         
+parser.add_argument('--nhid',type=int,default=32,help='')                               
+parser.add_argument('--in_dim',type=int,default=2,help='inputs dimension')              
+parser.add_argument('--num_nodes',type=int,default=207,help='number of nodes')          
+parser.add_argument('--batch_size',type=int,default=64,help='batch size')               
+parser.add_argument('--save',type=str,default=None,help='save path') 
+parser.add_argument('--load_path', type = str, default = None)                          
+                                                                                        
+args = parser.parse_args()                                                              
+                                                                                        
+                                                                                        
+def count_parameters(model):                                                            
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)                
+                                                                                        
+                                                                                        
+def main():                                                                             
+    device = torch.device(args.device)                                                  
+    if args.adjdata:                                                                    
+        sensor_ids, sensor_id_to_ind, adj_mx = util.load_adj(args.adjdata,args.adjtype) 
+        args.num_nodes = len(sensor_ids)                                                
+    dataloader = util.load_dataset(args.data, args.batch_size, args.batch_size, args.batch_size)                                                                                
+    scaler = dataloader['scaler']                                                       
+                                                                                        
+    print(args)                                                                         
+                                                                                        
     engine = trainer(scaler, args.in_dim, args.seq_length, args.num_nodes, args.nhid, 0., device)
-
-
     if args.load_path is None:
         raise ValueError
     else:

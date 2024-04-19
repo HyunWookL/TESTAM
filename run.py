@@ -26,11 +26,11 @@ if args.dataset not in BATCH_DICT.keys():
 if not os.path.exists('experiment/{}_{}'.format(args.dataset, args.i)):
     os.makedirs('experiment/{}_{}'.format(args.dataset, args.i))
 if args.dataset == 'EXPY-TKY':
-    log = "python -u train.py --batch_size 8 --seq_length 6 --dropout 0.0 --seed -1 --save ./experiment/{}_{}/TESTAM --data ./data/{} --adjdata ./data/{}/adj_mx.pkl --device {}"
+    log = "python -u train.py --batch_size {} --seq_length 6 --dropout 0.0 --seed -1 --save ./experiment/{}_{}/TESTAM --data ./data/{} --adjdata ./data/{}/adj_mx.pkl --device {}"
 else:
-    batch_size = BATCH_DICT[args.dataset]
-    log = "python -u train.py --batch_size 16 --dropout 0.0 --seed -1 --save ./experiment/{}_{}/TESTAM --data ./data/{} --adjdata ./data/{}/adj_mx.pkl --device {} --n_warmup_steps 4000"
-print(log.format(args.dataset, args.i, args.dataset, args.dataset, device, args.dataset, args.i))
-os.system(log.format(args.dataset, args.i, args.dataset, args.dataset, device, args.dataset, args.i))
+    log = "python -u train.py --batch_size {} --dropout 0.0 --seed -1 --save ./experiment/{}_{}/TESTAM --data ./data/{} --adjdata ./data/{}/adj_mx.pkl --device {} --n_warmup_steps 4000"
+batch_size = BATCH_DICT[args.dataset]
+print(log.format(batch_size, args.dataset, args.i, args.dataset, args.dataset, device, args.dataset, args.i))
+os.system(log.format(batch_size, args.dataset, args.i, args.dataset, args.dataset, device, args.dataset, args.i))
 
 

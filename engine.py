@@ -31,12 +31,12 @@ class trainer():
         ind_loss = self.loss(self.scaler.inverse_transform(res), real.permute(0,2,3,1), 0.0, reduce = None)
         if self.flag:
             gated_loss = self.loss(predict, real, reduce = None).permute(0,2,3,1)
-            l_worst_avoidance, l_best_select = self.get_quantile_label(gated_loss, gate, real)
+            l_worst_avoidance, l_best_choice = self.get_quantile_label(gated_loss, gate, real)
         else:
-            l_worst_avoidance, l_best_select = self.get_label(ind_loss, gate, real)
+            l_worst_avoidance, l_best_choice = self.get_label(ind_loss, gate, real)
 
-        worst_avoidance = -1 * l_worst_avoidance * torch.log(gate)
-        best_choice = -1 * l_best_select * torch.log(gate)
+        worst_avoidance = -.5 * l_worst_avoidance * torch.log(gate)
+        best_choice = -.5 * l_best_choice * torch.log(gate)
 
         if cur_epoch <= self.warmup_epoch:
             loss = self.loss(self.scaler.inverse_transform(res), real.permute(0,2,3,1), 0.0)
@@ -75,8 +75,8 @@ class trainer():
         selected[incorrect] = scaling[incorrect]
         l_worst_avoidance = selected.detach()
         selected = torch.zeros_like(gate).scatter(-1, cur_expert, 1.0) * correct
-        l_best_select = selected.detach()
-        return l_worst_avoidance, l_best_select
+        l_best_choice = selected.detach()
+        return l_worst_avoidance, l_best_choice
 
     def get_label(self, ind_loss, gate, real):
         empty_val = (real.permute(0,2,3,1).expand_as(gate)) == 0
