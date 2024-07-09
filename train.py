@@ -9,7 +9,7 @@ from engine import trainer
 parser = argparse.ArgumentParser()
 parser.add_argument('--device',type=str,default='cuda:0',help='')
 parser.add_argument('--data',type=str,default='data/METR-LA',help='data path')
-parser.add_argument('--adjdata',type=str,default='data/METR-LA/adj_mx.pkl',help='adj data path')
+parser.add_argument('--adjdata',type=str,default=None,help='adj data path')
 parser.add_argument('--adjtype',type=str,default='doubletransition',help='adj type')
 parser.add_argument('--seq_length',type=int,default=12,help='')
 parser.add_argument('--nhid',type=int,default=32,help='')
@@ -46,8 +46,13 @@ def main():
     #load data
     device = torch.device(args.device)
     if args.adjdata:
-        sensor_ids, sensor_id_to_ind, adj_mx = util.load_adj(args.adjdata,args.adjtype)
-        args.num_nodes = len(sensor_ids)
+        if os.path.exists(args.adjdata):
+          sensor_ids, sensor_id_to_ind, adj_mx = util.load_adj(args.adjdata,args.adjtype) 
+          args.num_nodes = len(sensor_ids)                                                
+        else:
+          print("Invalid File Path; utliize user-provided args.num_nodes")
+            
+    dataloader = util.load_dataset(args.data, args.batch_size, args.batch_size, args.batch_size)              
     dataloader = util.load_dataset(args.data, args.batch_size, args.batch_size, args.batch_size)
     scaler = dataloader['scaler']
     supports = [torch.tensor(i).to(device) for i in adj_mx]
