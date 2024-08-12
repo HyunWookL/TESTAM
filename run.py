@@ -15,6 +15,12 @@ BATCH_DICT = {
         'PEMS-BAY': 32
         }
 
+INIT_DICT = {
+        'EXPY-TKY': 0,
+        'METR-LA': 3,
+        'PEMS-BAY': 5
+        }
+
 if args.device < 0:
     print("Device ID is not Specified!")
     print("Continue training with CPU...")
@@ -26,11 +32,12 @@ if args.dataset not in BATCH_DICT.keys():
 if not os.path.exists('experiment/{}_{}'.format(args.dataset, args.i)):
     os.makedirs('experiment/{}_{}'.format(args.dataset, args.i))
 if args.dataset == 'EXPY-TKY':
-    log = "python -u train.py --batch_size {} --seq_length 6 --dropout 0.0 --seed -1 --save ./experiment/{}_{}/TESTAM --data ./data/{} --adjdata ./data/{}/adj_mx.pkl --device {}"
+    log = "python -u train.py --batch_size {} --dropout 0.0 --seed -1 --save ./experiment/{}_{}/TESTAM --data ./data/{} --adjdata ./data/{}/adj_mx.pkl --device {}--warmup_epoch {} --out_dim 1"
 else:
-    log = "python -u train.py --batch_size {} --dropout 0.0 --seed -1 --save ./experiment/{}_{}/TESTAM --data ./data/{} --adjdata ./data/{}/adj_mx.pkl --device {} --n_warmup_steps 4000"
+    log = "python -u train.py --batch_size {} --dropout 0.0 --seed -1 --save ./experiment/{}_{}/TESTAM --data ./data/{} --adjdata ./data/{}/adj_mx.pkl --device {} --n_warmup_steps 4000 --warmup_epoch {} --out_dim 1"
 batch_size = BATCH_DICT[args.dataset]
-print(log.format(batch_size, args.dataset, args.i, args.dataset, args.dataset, device, args.dataset, args.i))
-os.system(log.format(batch_size, args.dataset, args.i, args.dataset, args.dataset, device, args.dataset, args.i))
+warmup_epoch = INIT_DICT[args.dataset]
+print(log.format(batch_size, args.dataset, args.i, args.dataset, args.dataset, device, warmup_epoch))
+#os.system(log.format(batch_size, args.dataset, args.i, args.dataset, args.dataset, device, warmup_epoch))
 
 

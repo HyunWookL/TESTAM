@@ -11,7 +11,7 @@ parser.add_argument('--device',type=str,default='cuda:0',help='')
 parser.add_argument('--data',type=str,default='data/METR-LA',help='data path')
 parser.add_argument('--adjdata',type=str,default=None,help='adj data path')
 parser.add_argument('--adjtype',type=str,default='doubletransition',help='adj type')
-parser.add_argument('--seq_length',type=int,default=12,help='')
+parser.add_argument('--out_dim',type=int,default=1,help='')
 parser.add_argument('--nhid',type=int,default=32,help='')
 parser.add_argument('--in_dim',type=int,default=2,help='inputs dimension')
 parser.add_argument('--num_nodes',type=int,default=207,help='number of nodes')
@@ -55,12 +55,11 @@ def main():
     dataloader = util.load_dataset(args.data, args.batch_size, args.batch_size, args.batch_size)              
     dataloader = util.load_dataset(args.data, args.batch_size, args.batch_size, args.batch_size)
     scaler = dataloader['scaler']
-    supports = [torch.tensor(i).to(device) for i in adj_mx]
 
     print(args)
 
 
-    engine = trainer(scaler, args.in_dim, args.seq_length, args.num_nodes, args.nhid, args.dropout,
+    engine = trainer(scaler, args.in_dim, args.out_dim, args.num_nodes, args.nhid, args.dropout,
                          device, args.lr_mul, args.n_warmup_steps, args.quantile, args.is_quantile, args.warmup_epoch)
 
     print("Train the model with {} parameters".format(count_parameters(engine.model)))
@@ -88,7 +87,7 @@ def main():
             trainx= trainx.transpose(1, 3)
             trainy = torch.Tensor(y).to(device)
             trainy = trainy.transpose(1, 3)
-            metrics = engine.train(trainx, trainy[:,0,:,:], i)
+            metrics = engine.train(trainx, trainy[:,:-1,:,:], i)
             train_loss.append(metrics[0])
             train_mape.append(metrics[1])
             train_rmse.append(metrics[2])
@@ -108,7 +107,7 @@ def main():
             testx = testx.transpose(1, 3)
             testy = torch.Tensor(y).to(device)
             testy = testy.transpose(1, 3)
-            metrics = engine.eval(testx, testy[:,0,:,:])
+            metrics = engine.eval(testx, testy[:,:-1,:,:])
             valid_loss.append(metrics[0])
             valid_mape.append(metrics[1])
             valid_rmse.append(metrics[2])
@@ -147,14 +146,14 @@ def main():
 
     outputs = []
     realy = torch.Tensor(dataloader['y_test']).to(device)
-    realy = realy.transpose(1,3)[:,0,:,:]
+    realy = realy.transpose(1,3)[:,:args.out_dim,:,:]
 
     for iter, (x, y) in enumerate(dataloader['test_loader'].get_iterator()):
         testx = torch.Tensor(x).to(device)
         testx = testx.transpose(1,3)
         with torch.no_grad():
             preds = engine.model(testx)
-        outputs.append(preds.squeeze())
+        outputs.append(preds)
 
     yhat = torch.cat(outputs,dim=0)
     yhat = yhat[:realy.size(0),...]
@@ -169,9 +168,9 @@ def main():
     armse = []
     results = {'prediction': [], 'ground_truth':[]}
     from copy import deepcopy as cp
-    for i in range(args.seq_length):
-        pred = scaler.inverse_transform(yhat[:,:,i])
-        real = realy[:,:,i]
+    for i in range(realy.size(-1)):
+        pred = scaler.inverse_transform(yhat[...,i])
+        real = realy[...,i]
         results['prediction'].append(cp(pred).cpu().numpy())
         results['ground_truth'].append(cp(real).cpu().numpy())
         metrics = util.metric(pred,real)

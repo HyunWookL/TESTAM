@@ -10,7 +10,7 @@ parser.add_argument('--device',type=str,default='cuda:0',help='')
 parser.add_argument('--data',type=str,default='data/METR-LA',help='data path')          
 parser.add_argument('--adjdata',type=str,default=None,help='adj data path')                                                                                
 parser.add_argument('--adjtype',type=str,default='doubletransition',help='adj type')    
-parser.add_argument('--seq_length',type=int,default=12,help='')                         
+parser.add_argument('--out_dim',type=int,default=1,help='')                         
 parser.add_argument('--nhid',type=int,default=32,help='')                               
 parser.add_argument('--in_dim',type=int,default=2,help='inputs dimension')              
 parser.add_argument('--num_nodes',type=int,default=207,help='number of nodes')          
@@ -38,7 +38,7 @@ def main():
                                                                                         
     print(args)                                                                         
                                                                                         
-    engine = trainer(scaler, args.in_dim, args.seq_length, args.num_nodes, args.nhid, 0., device)
+    engine = trainer(scaler, args.in_dim, args.out_dim, args.num_nodes, args.nhid, 0., device)
     if args.load_path is None:
         raise ValueError
     else:
@@ -48,7 +48,7 @@ def main():
 
     outputs = []
     realy = torch.Tensor(dataloader['y_test']).to(device)
-    realy = realy.transpose(1,3)[:,0,:,:]
+    realy = realy.transpose(1,3)[:,:args.out_dim,:,:]
     output_gates = []
     output_ind = []
 
@@ -57,25 +57,25 @@ def main():
         testx = testx.transpose(1,3)
         with torch.no_grad():
             preds, gate, ind_out = engine.model(testx, gate_out = True)
-        outputs.append(preds.squeeze())
+        outputs.append(preds)
         output_gates.append(gate)
         output_ind.append(ind_out)
 
     yhat = torch.cat(outputs,dim=0)
     yhat = yhat[:realy.size(0),...]
 
-    yhat_gates = torch.cat(output_gates, dim = 0)[:realy.size(0),...]
-    yhat_ind = torch.cat(output_ind, dim = 0)[:realy.size(0),...]
+    yhat_gates = torch.cat(output_gates, dim = 0)[:realy.size(0),...].permute(0,3,1,2,4).contiguous()
+    yhat_ind = torch.cat(output_ind, dim = 0)[:realy.size(0),...].permute(0,3,1,2,4).contiguous()
     yhat_ind = scaler.inverse_transform(yhat_ind)
     tmp = yhat_gates.argmax(dim = -1)
     print("Gates!")
-    for i in range(3):
+    for i in range(yhat_gates.size(-1)):
         print((tmp == i).sum())
-        cur_ind = yhat_ind[:,:,-1,i]
-        metrics = util.metric(cur_ind, realy[:,:,-1])
+        cur_ind = yhat_ind[:,:,:,-1,i]
+        metrics = util.metric(cur_ind, realy[...,-1])
         log = 'Evaluate best model on test data for horizon {:d}, Test MAE: {:.4f}, Test MAPE: {:.4f}, Test RMSE: {:.4f}'
-        print(log.format(args.seq_length, metrics[0], metrics[1], metrics[2]))
-        print('On average over {} horizons, Test MAE: {:.4f}, Test MAPE: {:.4f}, Test RMSE: {:.4f}'.format(args.seq_length, *util.metric(yhat_ind[...,i], realy)))
+        print(log.format(realy.size(-1), metrics[0], metrics[1], metrics[2]))
+        print('On average over {} horizons, Test MAE: {:.4f}, Test MAPE: {:.4f}, Test RMSE: {:.4f}'.format(realy.size(-1), *util.metric(yhat_ind[...,i], realy)))
 
 
     amae = []
@@ -83,9 +83,9 @@ def main():
     armse = []
     results = {'prediction': [], 'ground_truth':[], 'gate':[],}
     from copy import deepcopy as cp
-    for i in range(args.seq_length):
-        pred = scaler.inverse_transform(yhat[:,:,i])
-        real = realy[:,:,i]
+    for i in range(realy.size(-1)):
+        pred = scaler.inverse_transform(yhat[...,i])
+        real = realy[...,i]
         results['prediction'].append(cp(pred).cpu().numpy())
         results['ground_truth'].append(cp(real).cpu().numpy())
         metrics = util.metric(pred,real)
@@ -96,7 +96,7 @@ def main():
         armse.append(metrics[2])
 
     log = 'On average over {} horizons, Test MAE: {:.4f}, Test MAPE: {:.4f}, Test RMSE: {:.4f}'
-    print(log.format(args.seq_length, np.mean(amae),np.mean(amape),np.mean(armse)))
+    print(log.format(realy.size(-1), np.mean(amae),np.mean(amape),np.mean(armse)))
     results['prediction'] = np.asarray(results['prediction'])
     results['ground_truth'] = np.asarray(results['ground_truth'])
     results['gate'] = np.asarray(cp(yhat_gates).cpu().numpy())

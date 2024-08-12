@@ -243,10 +243,11 @@ class TemporalModel(nn.Module):
         - vocab_size: total number of temporal features (e.g., 7 days)
             - Notes: in the trivial traffic forecasting problem, we have total 288 = 24 * 60 / 5 (5 min interval)
     """
-    def __init__(self, hidden_size, num_nodes, layers, dropout, in_dim = 1, vocab_size = 288, activation = nn.ReLU()):
+    def __init__(self, hidden_size, num_nodes, layers, dropout, in_dim = 1, out_dim = 1, vocab_size = 288, activation = nn.ReLU()):
         super(TemporalModel, self).__init__()
         self.vocab_size = vocab_size
         self.act = activation
+        self.in_dim = in_dim
         self.embedding = TemporalInformationEmbedding(hidden_size, vocab_size = vocab_size)
         self.spd_proj = nn.Linear(in_dim, hidden_size)
         self.spd_cat = nn.Linear(hidden_size * 2, hidden_size) # Cat speed information and TIM information
@@ -263,7 +264,7 @@ class TemporalModel(nn.Module):
             self.attn_layers.append(SkipConnection(cp(module), cp(norm)))
             self.ff.append(SkipConnection(cp(ff), cp(norm)))
         
-        self.proj = nn.Linear(hidden_size, 1)
+        self.proj = nn.Linear(hidden_size, out_dim)
 
 
     def forward(self, x, speed = None):
@@ -272,8 +273,8 @@ class TemporalModel(nn.Module):
         #The user may modify this node feature into meta-learning based representation, which enables the ability to adopt the model into different dataset
         x_nemb = torch.einsum('btc, nc -> bntc', TIM, self.node_features)
         if speed is None:
-            speed = torch.zeros_like(x_nemb[...,0])
-        x_spd = self.spd_proj(speed.unsqueeze(dim = -1))
+            speed = torch.zeros_like(x_nemb[...,:self.in_dim])
+        x_spd = self.spd_proj(speed)
         x_nemb = self.spd_cat(torch.cat([x_spd, x_nemb], dim = -1))
 
         attns = []
@@ -299,6 +300,7 @@ class STModel(nn.Module):
         super(STModel, self).__init__()
         self.spatial = spatial
         self.act = activation
+        self.out_dim = out_dim
 
         s_gcn = gcn(c_in = hidden_size, c_out = hidden_size, dropout = dropout, supports_len = supports_len, order = 2)
         t_attn = QKVAttention(in_dim = hidden_size, hidden_size = hidden_size, dropout = dropout)
@@ -307,11 +309,7 @@ class STModel(nn.Module):
         
         self.start_linear = nn.Linear(in_dim, hidden_size)
 
-        if out_dim == 1:
-            self.proj = nn.Linear(hidden_size, hidden_size + out_dim)
-        else:
-            self.proj = nn.Linear(hidden_size, out_dim)
-        self.out_dim = out_dim
+        self.proj = nn.Linear(hidden_size, hidden_size + out_dim)
 
         self.temporal_layers = nn.ModuleList()
         self.spatial_layers = nn.ModuleList()
@@ -341,8 +339,10 @@ class STModel(nn.Module):
             hiddens.append(x)
 
         out = self.proj(self.act(x))
+        res, out = torch.split(out, [out.size(-1) - self.out_dim, self.out_dim], dim = -1)
 
-        return x_start - out[...,:-1], out[...,[-1]], hiddens
+        return x_start - res, out.contiguous(), hiddens
+
 
 
 class AttentionModel(nn.Module):
@@ -407,11 +407,12 @@ class MemoryGate(nn.Module):
      - nodewise: flag to determine routing level. Traffic forecasting could have a more fine-grained routing, because it has additional dimension for the roads
         - True: enables node-wise routing probability calculation, which is coarse-grained one
     """
-    def __init__(self, hidden_size, num_nodes, mem_hid = 32, input_dim = 2, output_dim = 1, memory_size = 20, sim = nn.CosineSimilarity(dim = -1), nodewise = False, ind_proj = True, attention_type = 'attention'):
+    def __init__(self, hidden_size, num_nodes, mem_hid = 32, in_dim = 2, out_dim = 1, memory_size = 20, sim = nn.CosineSimilarity(dim = -1), nodewise = False, ind_proj = True, attention_type = 'attention'):
         super(MemoryGate, self).__init__()
         self.attention_type = attention_type
         self.sim = sim
         self.nodewise = nodewise
+        self.out_dim = out_dim
 
         self.memory = nn.Parameter(torch.empty(memory_size, mem_hid))
         
@@ -419,7 +420,7 @@ class MemoryGate(nn.Module):
         self.key = nn.ParameterList([nn.Parameter(torch.empty(hidden_size, mem_hid)) for _ in range(3)])
         self.value = nn.ParameterList([nn.Parameter(torch.empty(hidden_size, mem_hid)) for _ in range(3)])
         
-        self.input_query = nn.Parameter(torch.empty(input_dim, mem_hid))
+        self.input_query = nn.Parameter(torch.empty(in_dim, mem_hid))
 
         self.We1 = nn.Parameter(torch.empty(num_nodes, memory_size))
         self.We2 = nn.Parameter(torch.empty(num_nodes, memory_size))
@@ -443,7 +444,7 @@ class MemoryGate(nn.Module):
             scores.append(self.sim(memories, hidden_att))
 
         scores = torch.stack(scores, dim = -1)
-        return scores
+        return scores.unsqueeze(dim = -2)
 
     def attention(self, x, i):
         B, N, T, _ = x.size()
@@ -495,11 +496,11 @@ class MemoryGate(nn.Module):
 
 
 class AttnGate(nn.Module):
-    def __init__(self, hidden_size, num_nodes, input_dim = 2, sim = nn.CosineSimilarity(dim = -1)):
+    def __init__(self, hidden_size, num_nodes, in_dim = 2, sim = nn.CosineSimilarity(dim = -1)):
         super(AttnGate, self).__init__()
-        self.in_key = nn.Linear(input_dim, hidden_size, bias = False)
+        self.in_key = nn.Linear(in_dim, hidden_size, bias = False)
         self.hid_query = nn.Linear(hidden_size, hidden_size, bias = False)
-        self.in_value = nn.Linear(input_dim, hidden_size, bias = False)
+        self.in_value = nn.Linear(in_dim, hidden_size, bias = False)
         sim = lambda x, y: nn.PairwiseDistance()(x, y) * -1
         self.sim = sim
         self.proj = nn.Linear(hidden_size, 1)
@@ -535,17 +536,18 @@ class TESTAM(nn.Module):
     """
     TESTAM model
     """
-    def __init__(self, device, num_nodes, dropout=0.3, in_dim=2, out_dim=12,hidden_size=32, layers=3, prob_mul = False, **args):
+    def __init__(self, num_nodes, dropout=0.3, in_dim=2, out_dim = 1, hidden_size = 32, layers = 3, prob_mul = False, max_time_index = 288, **args):
         super(TESTAM, self).__init__()
         self.dropout = dropout
         self.prob_mul = prob_mul
         self.supports_len = 2
+        self.max_time_index = max_time_index
 
-        self.identity_expert = TemporalModel(hidden_size, num_nodes, in_dim = in_dim - 1, layers = layers, dropout = dropout)
-        self.adaptive_expert = STModel(hidden_size, self.supports_len, num_nodes, in_dim = in_dim, layers = layers, dropout = dropout)
-        self.attention_expert = AttentionModel(hidden_size, in_dim = in_dim, layers = layers, dropout = dropout)
+        self.identity_expert = TemporalModel(hidden_size, num_nodes, in_dim = in_dim - 1, out_dim = out_dim, layers = layers, dropout = dropout, vocab_size = max_time_index)
+        self.adaptive_expert = STModel(hidden_size, self.supports_len, num_nodes, in_dim = in_dim, out_dim = out_dim, layers = layers, dropout = dropout)
+        self.attention_expert = AttentionModel(hidden_size, in_dim = in_dim, out_dim = out_dim, layers = layers, dropout = dropout)
 
-        self.gate_network = MemoryGate(hidden_size, num_nodes)
+        self.gate_network = MemoryGate(hidden_size, num_nodes, in_dim = in_dim, out_dim = out_dim)
 
         for model in [self.identity_expert, self.adaptive_expert, self.attention_expert]:
             for n, p in model.named_parameters():
@@ -555,6 +557,7 @@ class TESTAM(nn.Module):
     def forward(self, input, gate_out = False):
         """
         input: B, in_dim, N, T
+         - Note: we assume that the last dimeions of in_dim is temporal feature, such as tod or dow (could be represented as integer)
         o_identity shape B, N, T, 1
         """
         n1 = torch.matmul(self.gate_network.We1, self.gate_network.memory)
@@ -564,9 +567,10 @@ class TESTAM(nn.Module):
         new_supports = [g1, g2]
 
         time_index = input[:,-1,0] # B, T
-        cur_time_index = (time_index * 288).long()
-        next_time_index = ((time_index * 288 + 12) % 288).long()
-        o_identity, h_identity = self.identity_expert(cur_time_index, input[:,0])
+        max_t = self.max_time_index
+        cur_time_index = ((time_index * max_t) % max_t).long()
+        next_time_index = ((time_index * max_t + time_index.size(-1)) % max_t).long()
+        o_identity, h_identity = self.identity_expert(cur_time_index, input[:,:-1].permute(0,2,3,1))
         _, h_future = self.identity_expert(next_time_index)
 
 
@@ -574,7 +578,7 @@ class TESTAM(nn.Module):
 
         o_attention, h_attention = self.attention_expert(input, h_future)
 
-        ind_out = torch.cat([o_identity, o_adaptive, o_attention], dim = -1)
+        ind_out = torch.stack([o_identity, o_adaptive, o_attention], dim = -1)
 
         B, N, T, _ = o_identity.size()
         gate_in = [h_identity[-1], h_adaptive[-1], h_attention]
@@ -597,9 +601,9 @@ class TESTAM(nn.Module):
             out = out * (route_prob_max).unsqueeze(dim = -1)
         
 
-        out = out.view(B,N,T,1) 
+        out = out.view(B,N,T,-1) 
 
-        out = out.permute(0,3,1,2) 
+        out = out.permute(0,3,1,2)
         if self.training or gate_out:
             return out, gate, ind_out
         else:
@@ -607,8 +611,8 @@ class TESTAM(nn.Module):
 
 if __name__ == "__main__":
     n = 207
-    model = TESTAM(device = 'cuda', num_nodes = n, supports = [torch.zeros(n,n).cuda() for _ in range(2)])
-    x = torch.zeros(8,2,n,6).cuda()
+    model = TESTAM(num_nodes = n, in_dim = 3, out_dim = 2, supports = [torch.zeros(n,n).cuda() for _ in range(2)])
+    x = torch.zeros(8,3,n,6).cuda()
     x[:,0] = torch.randn(8,n,6).cuda()
     model.cuda()
     model.eval()

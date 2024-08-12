@@ -1,3 +1,6 @@
 data/
 experiment/
+log/
+run_exp.py
+*.out
 **/__pycache__/
