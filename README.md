@@ -5,7 +5,7 @@ This is an official Pytorch implementation of TESTAM in the following paper: [TE
 ## Updates
 Here we describe the changes in official TESTAM code. 
 (Ongoing updates)
- - Revision of gating mechanism for multivariate spatio-temporal data
+ - Revision of gating mechanism and meta node bank for multivariate spatio-temporal data
  - Additional implementation of experts -- CNN-based spatial modeling, Graph Attention, etc.
  - Providing processed (and also merged) version of EXPY-TKY dataset (original dataset is not processed)
 
