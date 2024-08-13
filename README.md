@@ -1,6 +1,20 @@
 # TESTAM: A Time-Enhanced Spatio-Temporal Attention Model with Mixture of Experts
 This is an official Pytorch implementation of TESTAM in the following paper: [TESTAM: A Time-Enhanced Spatio-Temporal Attention Model with Mixture of Experts](https://openreview.net/forum?id=N0nTk5BSvO), ICLR 2024.
 
+
+## Updates
+Here we describe the changes in official TESTAM code. 
+(Ongoing updates)
+ - Revision of gating mechanism and meta node bank for multivariate spatio-temporal data
+ - Additional implementation of experts -- CNN-based spatial modeling, Graph Attention, etc.
+ - Providing processed (and also merged) version of EXPY-TKY dataset (original dataset is not processed)
+
+(2024-08-13)
+ - We revised TESTAM routing and fixed some issues -- e.g., some of the previous pseudo label-generation process are problematic with deprecated codes
+ - We partially updated TESTAM to be usable for the multivariate spatio-temporal data modeling. It is now capable for the multitask (or multivariate) forecasting with multiple output dimensions
+ - We provide multiple additional features such as load balancing loss (as previos MoEs), and uncertainty flag. You may refer to the engine.py
+ - We additionally revised some of redundancy in the codes
+
 ## Requirements
  - python>=3.8
  - torch>=1.7.1
@@ -50,7 +64,7 @@ We provide a more detailed and complete command description for the training cod
 
 ```
 python -u train.py --device DEVICE --data DATA --adjdata ADJDATA --adjtype ADJTYPE
- --seq_length SEQ_LENGTH --nhid NHID --in_dim IN_DIM --num_nodes N --batch_size B
+ --nhid NHID --in_dim IN_DIM --seq_length OUTDIM --num_nodes N --batch_size B
  --dropout DROPOUT --epochs EPOCHS --print_every PRINT_EVERY --seed SEED
  --save SAVE --expid EXPID --load_path LOAD_PATH --patience PATIENCE --lr_mul LR_MUL
  --n_warmup_steps N_WARMUP_STEPS --quantile Q --is_quantile IS_QUANTILE --warmup_epoch WARMUP_EPOCH
@@ -64,7 +78,7 @@ The detailed descriptions of the arguments are as follows:
 |data              | Path to the dataset directory (default: ./data/METR-LA)|
 |adjdata           | Path to the adjacency matrix file (default: ./data/METR-LA/adj_mx.pkl)|
 |adjtype           | Type of adjacency matrix. (default: 'doubletransition'). It could be set to 'scalap', 'normlap', 'symnadj', 'transition', 'doubletransition', 'identity'. It is only used to check the number of nodes|
-|seq_length        | Sequence length of the output signal (default: 12)|
+|out_dim           | Output dimensionality of TESTAM (default: 1 (i.e., speed)). It is implemented for the better use of TESTAM in the other generic spatio-temporal forecasting problems with multivariate setting.|
 |nhid              | Dimension of hidden unit (default: 32)|
 |in_dim            | Dimension of the input signal (default: 2 (speed, tod))|
 |num_nodes         | Number of total nodes (default: 207). If you provide adjdata, `train.py` will calculate appropriate num_nodes automatically|
@@ -87,7 +101,7 @@ The detailed descriptions of the arguments are as follows:
 For the testing, you can run the code below:
 ```
 python test.py --device DEVICE --data DATA --adjdata ADJDATA --adjtype ADJTYPE
- --seq_length SEQ_LENGTH --nhid NHID --in_dim IN_DIM --num_nodes N --batch_size B
+ --nhid NHID --in_dim IN_DIM --out_dim OUTDIM --num_nodes N --batch_size B
  --save SAVE --load_path LOAD_PATH
 ```
 
