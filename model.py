@@ -444,7 +444,7 @@ class MemoryGate(nn.Module):
             scores.append(self.sim(memories, hidden_att))
 
         scores = torch.stack(scores, dim = -1)
-        return scores.unsqueeze(dim = -2)
+        return scores.unsqueeze(dim = -2).expand(B, N, T, self.out_dim, scores.size(-1))
 
     def attention(self, x, i):
         B, N, T, _ = x.size()
